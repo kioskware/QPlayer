@@ -1,4 +1,4 @@
-package com.fivesoft.qplayer.bas2;
+package com.fivesoft.qplayer.track;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * A collection of tracks where tracks are identified by their id.<br>
@@ -21,9 +22,10 @@ public class Tracks implements Iterable<Track> {
 
     private final Map<String, Track> tracks = new HashMap<>();
 
-    //Stores references to latest audio and video tracks for faster access
+    //Stores references to latest audio, video and subtitle tracks for faster access
     private volatile AudioTrack audioTrack;
     private volatile VideoTrack videoTrack;
+    private volatile SubtitleTrack subtitleTrack;
 
     /**
      * Creates a new empty collection of tracks.
@@ -74,6 +76,8 @@ public class Tracks implements Iterable<Track> {
                 audioTrack = (AudioTrack) track;
             } else if(track instanceof VideoTrack){
                 videoTrack = (VideoTrack) track;
+            } else if(track instanceof SubtitleTrack){
+                subtitleTrack = (SubtitleTrack) track;
             }
         }
     }
@@ -108,8 +112,26 @@ public class Tracks implements Iterable<Track> {
                 audioTrack = null;
             } else if(prev == videoTrack){
                 videoTrack = null;
+            } else if(prev == subtitleTrack){
+                subtitleTrack = null;
             }
             return prev;
+        }
+    }
+
+    /**
+     * Removes all tracks that satisfy the specified predicate.
+     * @param predicate predicate. Must not be null.
+     * @throws NullPointerException if predicate is null.
+     */
+    public void removeIf(@NonNull Predicate<Track> predicate){
+        Objects.requireNonNull(predicate);
+        synchronized (tracks) {
+            for(Track track : tracks.values()){
+                if(predicate.test(track)){
+                    remove(track.id);
+                }
+            }
         }
     }
 
@@ -146,6 +168,7 @@ public class Tracks implements Iterable<Track> {
             tracks.clear();
             audioTrack = null;
             videoTrack = null;
+            subtitleTrack = null;
         }
     }
 
@@ -172,7 +195,18 @@ public class Tracks implements Iterable<Track> {
     }
 
     /**
-     * Gets all tracks in this collection. (audio tracks, video tracks, and other tracks)<br>
+     * Returns the subtitle track, or null if there was no subtitle track.<br>
+     * This method is faster than calling {@link #get(String)} with the id of the subtitle track.<br>
+     * If this collection contains multiple subtitle tracks, the last-modified (or added) subtitle track will be returned.
+     */
+
+    @Nullable
+    public SubtitleTrack getSubtitleTrack(){
+        return subtitleTrack;
+    }
+
+    /**
+     * Gets all tracks in this collection. (audio tracks, video tracks, subtitle tracks and other tracks)<br>
      * The returned array is a copy of the tracks in this collection, so modifying the returned array will not affect this collection.
      * @return all tracks in this collection.
      */
@@ -215,6 +249,23 @@ public class Tracks implements Iterable<Track> {
                     .filter(track -> track instanceof VideoTrack)
                     .map(track -> (VideoTrack) track)
                     .toArray(VideoTrack[]::new);
+        }
+    }
+
+    /**
+     * Gets all subtitle tracks in this collection.
+     * The returned array is a copy of the subtitle tracks in this collection, so modifying the returned array will not affect this collection.
+     * @return all subtitle tracks in this collection.
+     */
+
+    @NonNull
+    public SubtitleTrack[] getSubtitleTracks(){
+        synchronized (tracks) {
+            return tracks.values()
+                    .stream()
+                    .filter(track -> track instanceof SubtitleTrack)
+                    .map(track -> (SubtitleTrack) track)
+                    .toArray(SubtitleTrack[]::new);
         }
     }
 

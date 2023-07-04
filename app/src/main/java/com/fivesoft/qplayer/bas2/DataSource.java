@@ -3,6 +3,8 @@ package com.fivesoft.qplayer.bas2;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.fivesoft.qplayer.bas2.common.Constants;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -48,7 +50,7 @@ public abstract class DataSource implements AutoCloseable, Timeoutable {
      * Indicates that the length of the data source is unknown.
      */
 
-    public static final long UNKNOWN_LENGTH = -1;
+    public static final long UNKNOWN_LENGTH = Constants.UNKNOWN_VALUE;
 
     /**
      * Returns total length of the data source in bytes.

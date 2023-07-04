@@ -2,8 +2,9 @@ package com.fivesoft.qplayer.bas2;
 
 import androidx.annotation.NonNull;
 
+import com.fivesoft.qplayer.track.Tracks;
+
 import java.io.IOException;
-import java.sql.Time;
 import java.util.Iterator;
 import java.util.Objects;
 
@@ -130,8 +131,26 @@ public abstract class MediaExtractor
     @NonNull
     public abstract Tracks getTracks();
 
+    /**
+     * Gets the duration of the data source in milliseconds.<br>
+     * @return The duration of the data source in milliseconds or -1
+     * if the duration is unknown (most common for live streams).
+     */
+    public abstract long getDuration();
+
+    /**
+     * Releases all resources associated with this extractor.<br>
+     * This does not close the data source associated with this extractor.<br>
+     * @throws IOException if any I/O error occurs while closing the extractor.
+     */
+
     @Override
     public abstract void close() throws IOException;
+
+    /**
+     * Sets the timeout value for I/O operations.<br>
+     * @param timeout The timeout value in milliseconds. Non-positive value means no timeout. (waiting forever)
+     */
 
     @Override
     public void setTimeout(int timeout) {
@@ -146,11 +165,20 @@ public abstract class MediaExtractor
         }
     }
 
+    /**
+     * Gets the timeout value for I/O operations. (set by {@link #setTimeout(int)})<br>
+     * @return The timeout value in milliseconds. Non-positive value means no timeout. (waiting forever)
+     */
+
     @Override
     public int getTimeout() {
         return timeout;
     }
 
+    /**
+     * Iterator for easy iteration over samples.<br>
+     * @return An iterator for easy iteration over samples.
+     */
     @NonNull
     @Override
     public Iterator<Sample> iterator() {
@@ -165,6 +193,16 @@ public abstract class MediaExtractor
                 return null;
             }
         };
+    }
+
+    /**
+     * Gets data source associated with this extractor.<br>
+     * @return The data source associated with this extractor.
+     */
+
+    @NonNull
+    public DataSource getDataSource() {
+        return dataSource;
     }
 
     /**
