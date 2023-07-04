@@ -164,6 +164,8 @@ public abstract class DataSource implements AutoCloseable, Timeoutable {
 
     @Override
     public final void setTimeout(int timeout) throws RuntimeException {
+        if(timeout == this.timeout)
+            return;
         this.timeout = timeout;
         try {
             onTimeoutSet(Math.max(timeout, 0));
