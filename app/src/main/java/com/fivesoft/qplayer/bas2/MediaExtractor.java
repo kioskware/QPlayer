@@ -98,27 +98,83 @@ public abstract class MediaExtractor
     public abstract void prepare(int timeout) throws IOException, TimeoutException;
 
     /**
-     * Returns the total number of samples available in the data source.<br>
-     * @return The number of samples available in the data source or -1 if the number of samples is unknown.
+     * Seeks to the specified time in milliseconds.<br>
+     * The passed value will be rounded to the nearest key frame.<br>
+     * @param timeUs the time in milliseconds to seek to.
+     * @param flags (optional) for specific extractor implementation.
+     * @throws IOException if any I/O error occurs while seeking.
+     * @throws TimeoutException if the timeout is reached while seeking.
+     * @throws UnsupportedOperationException if the extractor does not support seeking.
      * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
-     * @throws RuntimeException if other error occurs.
+     * @throws IllegalArgumentException if the passed time is negative.
      */
 
-    public abstract long getSampleCount() throws IllegalStateException;
+    public abstract void seekToTime(long timeUs, int flags)
+            throws IOException, TimeoutException, UnsupportedOperationException,
+            IllegalStateException, IllegalArgumentException;
 
     /**
-     * Returns the sample at the specified index.<br>
-     * @param index The index of the sample to return. (index starts from 0)
-     * @return The sample at the specified index.
-     * @throws IOException if any I/O error occurs while reading the sample.
-     * @throws TimeoutException if the operation times out.
-     * @throws IndexOutOfBoundsException if the index is out of range.
-     * @throws IllegalArgumentException if the index is negative.
+     * Seeks to the specified time in milliseconds.<br>
+     * The passed value will be rounded to the nearest key frame.<br>
+     * @param timeUs the time in milliseconds to seek to.
+     * @throws IOException if any I/O error occurs while seeking.
+     * @throws TimeoutException if the timeout is reached while seeking.
+     * @throws UnsupportedOperationException if the extractor does not support seeking.
      * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
+     * @throws IllegalArgumentException if the passed time is negative.
      */
 
-    @NonNull
-    public abstract Sample getSampleAt(long index) throws IOException, TimeoutException;
+    public final void seekToTime(long timeUs)
+            throws IOException, TimeoutException, UnsupportedOperationException,
+            IllegalStateException, IllegalArgumentException {
+        seekToTime(timeUs, 0);
+    }
+
+    /**
+     * Seeks to the specified sample index.<br>
+     * In contrast to {@link #seekToTime(long, int)} this method
+     * does not round the passed value to the nearest key frame.<br>
+     * @param sampleIndex the sample index to seek to.
+     * @param flags (optional) for specific extractor implementation.
+     * @throws IOException if any I/O error occurs while seeking.
+     * @throws TimeoutException if the timeout is reached while seeking.
+     * @throws UnsupportedOperationException if the extractor does not support seeking.
+     * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
+     * @throws IllegalArgumentException if the passed sample index is negative.
+     * @throws IndexOutOfBoundsException if the passed sample index is greater than the number of samples in the data source.
+     */
+
+    public abstract void seekToSample(long sampleIndex, int flags)
+            throws IOException, TimeoutException, UnsupportedOperationException,
+            IllegalStateException, IllegalArgumentException, IndexOutOfBoundsException;
+
+    /**
+     * Seeks to the specified sample index.<br>
+     * In contrast to {@link #seekToTime(long, int)} this method
+     * does not round the passed value to the nearest key frame.<br>
+     * @param sampleIndex the sample index to seek to.
+     * @throws IOException if any I/O error occurs while seeking.
+     * @throws TimeoutException if the timeout is reached while seeking.
+     * @throws UnsupportedOperationException if the extractor does not support seeking.
+     * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
+     * @throws IllegalArgumentException if the passed sample index is negative.
+     * @throws IndexOutOfBoundsException if the passed sample index is greater than the number of samples in the data source.
+     */
+
+    public final void seekToSample(long sampleIndex)
+            throws IOException, TimeoutException, UnsupportedOperationException,
+            IllegalStateException, IllegalArgumentException, IndexOutOfBoundsException {
+        seekToSample(sampleIndex, 0);
+    }
+
+    /**
+     * Reads next sample from the data source.<br>
+     * @return The next sample or null if the end of the data source is reached.
+     * @throws IOException if any I/O error occurs while reading the sample.
+     * @throws TimeoutException if the timeout is reached while reading the sample.
+     * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
+     */
+    public abstract Sample nextSample() throws IOException, TimeoutException, IllegalStateException;
 
     /**
      * Returns tracks collection available in the data source.<br>
@@ -129,14 +185,37 @@ public abstract class MediaExtractor
      */
 
     @NonNull
-    public abstract Tracks getTracks();
+    public abstract Tracks getTracks() throws IllegalStateException, RuntimeException;
 
     /**
      * Gets the duration of the data source in milliseconds.<br>
      * @return The duration of the data source in milliseconds or -1
      * if the duration is unknown (most common for live streams).
      */
-    public abstract long getDuration();
+    public abstract long getDuration() throws IllegalStateException;
+
+    /**
+     * Gets the current position in milliseconds.<br>
+     * @return The current position in milliseconds or -1 if the
+     * position is unknown.
+     */
+
+    public abstract long getPosition() throws IllegalStateException;
+
+    /**
+     * Gets the number of samples in the data source.<br>
+     * @return The number of samples in the data source or -1
+     * if the number of samples is unknown (most common for live streams).
+     */
+
+    public abstract long getSampleCount() throws IllegalStateException;
+
+    /**
+     * Gets the current sample index.<br>
+     * @return The current sample index or -1 if the index is unknown.
+     */
+
+    public abstract long getSampleIndex() throws IllegalStateException;
 
     /**
      * Releases all resources associated with this extractor.<br>
@@ -183,14 +262,25 @@ public abstract class MediaExtractor
     @Override
     public Iterator<Sample> iterator() {
         return new Iterator<Sample>() {
+
+            boolean endReached = false;
+
             @Override
             public boolean hasNext() {
-                return false;
+                return !endReached;
             }
 
             @Override
             public Sample next() {
-                return null;
+                try {
+                    Sample res = nextSample();
+                    if(res == null) {
+                        endReached = true;
+                    }
+                    return res;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
         };
     }
