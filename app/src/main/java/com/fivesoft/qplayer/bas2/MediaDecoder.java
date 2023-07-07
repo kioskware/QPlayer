@@ -11,6 +11,11 @@ import androidx.annotation.Nullable;
  *     <li>Decode the sample using {@link #decode(Sample)} method.</li>
  *     <li>Play the decoded frame on output.</li>
  * </ol>
+ * <p>
+ *     Media decoders should generally be thread-safe and methods
+ *     {@link #feed(Sample)} and {@link #decode(Sample)}
+ *     should work independently from each other.
+ * </p>
  * @param <OutputType> Type of the output where frame should be played.
  *                    (e.g. {@link android.view.Surface Surface} for video decoder)
  */
@@ -52,7 +57,8 @@ public abstract class MediaDecoder<OutputType> {
             UnsupportedSampleException, NullPointerException;
 
     /**
-     * Decodes the media sample and plays the decoded frame on output.
+     * Decodes the media sample and plays the decoded frame on output.<br>
+     * The frame playback may be asynchronous, so the method may return before the frame is played.
      * @param sample Sample to decode. Cannot be null.
      * @throws IllegalStateException If the decoder is released.
      * @throws UnsupportedSampleException If the sample is not supported by the decoder or is corrupted.

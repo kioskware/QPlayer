@@ -1,6 +1,7 @@
 package com.fivesoft.qplayer.bas2;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.fivesoft.qplayer.track.Tracks;
 
@@ -21,7 +22,7 @@ import java.util.Objects;
  */
 
 public abstract class MediaExtractor
-        implements AutoCloseable, Iterable<Sample>, Timeoutable {
+        implements AutoCloseable, Timeoutable {
 
     protected final DataSource dataSource;
     private int timeout = 15000;
@@ -93,9 +94,12 @@ public abstract class MediaExtractor
 
     /**
      * Prepares the extractor for reading samples.<br>
+     * @throws IOException if any I/O error occurs while preparing.
+     * @throws TimeoutException if the timeout is reached while preparing.
+     * @throws InterruptedException if the thread is interrupted while preparing.
      */
 
-    public abstract void prepare(int timeout) throws IOException, TimeoutException;
+    public abstract void prepare(int timeout) throws IOException, TimeoutException, InterruptedException;
 
     /**
      * Seeks to the specified time in milliseconds.<br>
@@ -107,10 +111,11 @@ public abstract class MediaExtractor
      * @throws UnsupportedOperationException if the extractor does not support seeking.
      * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
      * @throws IllegalArgumentException if the passed time is negative.
+     * @throws InterruptedException if the thread is interrupted while seeking.
      */
 
     public abstract void seekToTime(long timeUs, int flags)
-            throws IOException, TimeoutException, UnsupportedOperationException,
+            throws IOException, TimeoutException, UnsupportedOperationException, InterruptedException,
             IllegalStateException, IllegalArgumentException;
 
     /**
@@ -122,10 +127,11 @@ public abstract class MediaExtractor
      * @throws UnsupportedOperationException if the extractor does not support seeking.
      * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
      * @throws IllegalArgumentException if the passed time is negative.
+     * @throws InterruptedException if the thread is interrupted while seeking.
      */
 
     public final void seekToTime(long timeUs)
-            throws IOException, TimeoutException, UnsupportedOperationException,
+            throws IOException, TimeoutException, UnsupportedOperationException, InterruptedException,
             IllegalStateException, IllegalArgumentException {
         seekToTime(timeUs, 0);
     }
@@ -142,10 +148,11 @@ public abstract class MediaExtractor
      * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
      * @throws IllegalArgumentException if the passed sample index is negative.
      * @throws IndexOutOfBoundsException if the passed sample index is greater than the number of samples in the data source.
+     * @throws InterruptedException if the thread is interrupted while seeking.
      */
 
     public abstract void seekToSample(long sampleIndex, int flags)
-            throws IOException, TimeoutException, UnsupportedOperationException,
+            throws IOException, TimeoutException, UnsupportedOperationException, InterruptedException,
             IllegalStateException, IllegalArgumentException, IndexOutOfBoundsException;
 
     /**
@@ -159,10 +166,11 @@ public abstract class MediaExtractor
      * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
      * @throws IllegalArgumentException if the passed sample index is negative.
      * @throws IndexOutOfBoundsException if the passed sample index is greater than the number of samples in the data source.
+     * @throws InterruptedException if the thread is interrupted while seeking.
      */
 
     public final void seekToSample(long sampleIndex)
-            throws IOException, TimeoutException, UnsupportedOperationException,
+            throws IOException, TimeoutException, UnsupportedOperationException, InterruptedException,
             IllegalStateException, IllegalArgumentException, IndexOutOfBoundsException {
         seekToSample(sampleIndex, 0);
     }
@@ -173,8 +181,10 @@ public abstract class MediaExtractor
      * @throws IOException if any I/O error occurs while reading the sample.
      * @throws TimeoutException if the timeout is reached while reading the sample.
      * @throws IllegalStateException If the extractor is not prepared yet or it is closed.
+     * @throws InterruptedException if the thread is interrupted while reading the sample.
      */
-    public abstract Sample nextSample() throws IOException, TimeoutException, IllegalStateException;
+    public abstract Sample nextSample() throws IOException, TimeoutException,
+            IllegalStateException, InterruptedException;
 
     /**
      * Returns tracks collection available in the data source.<br>
@@ -227,6 +237,15 @@ public abstract class MediaExtractor
     public abstract void close() throws IOException;
 
     /**
+     * Sets the authentication for the data source.<br>
+     * Used for data sources that require authentication. (e.g. HTTP Basic Authentication)<br>
+     * @param authentication The authentication for the data source or null
+     *                       if no authentication is needed.
+     */
+
+    public abstract void setAuthentication(@Nullable Authentication authentication);
+
+    /**
      * Sets the timeout value for I/O operations.<br>
      * @param timeout The timeout value in milliseconds. Non-positive value means no timeout. (waiting forever)
      */
@@ -252,37 +271,6 @@ public abstract class MediaExtractor
     @Override
     public int getTimeout() {
         return timeout;
-    }
-
-    /**
-     * Iterator for easy iteration over samples.<br>
-     * @return An iterator for easy iteration over samples.
-     */
-    @NonNull
-    @Override
-    public Iterator<Sample> iterator() {
-        return new Iterator<Sample>() {
-
-            boolean endReached = false;
-
-            @Override
-            public boolean hasNext() {
-                return !endReached;
-            }
-
-            @Override
-            public Sample next() {
-                try {
-                    Sample res = nextSample();
-                    if(res == null) {
-                        endReached = true;
-                    }
-                    return res;
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        };
     }
 
     /**
