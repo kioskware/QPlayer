@@ -6,45 +6,49 @@ import androidx.annotation.Nullable;
 import com.fivesoft.qplayer.bas2.common.ThrowingRunnable;
 
 import java.io.IOException;
+import java.util.Objects;
+
+/**
+ * Thread that reads samples from {@link MediaExtractor} and handles them.<br>
+ * This is simple class that does not handle any errors, just passes them forward.<br>
+ */
 
 public abstract class SampleReadThread extends Thread {
 
     private volatile boolean run = true;
+    @NonNull
+    private final DataSource source;
+    @NonNull
+    private final MediaExtractor extractor;
 
-    public SampleReadThread() {
+    /**
+     * Creates new SampleReadThread.
+     * @param source Data source to read samples from.
+     * @param extractor Media extractor to read samples with.
+     *                  Must be associated with source passed with source parameter,
+     *                  {@link IllegalArgumentException} will be thrown otherwise.
+     */
+
+    public SampleReadThread(@NonNull DataSource source, @NonNull MediaExtractor extractor) {
         super();
-    }
-
-    public SampleReadThread(@NonNull String name) {
-        super(name);
-    }
-
-    public SampleReadThread(@Nullable ThreadGroup group, @NonNull String name) {
-        super(group, name);
+        this.source = Objects.requireNonNull(source);
+        this.extractor = Objects.requireNonNull(extractor);
+        //Check if extractor is associated with source object
+        if(extractor.getDataSource() != source) {
+            throw new IllegalArgumentException("Extractor is not associated with source");
+        }
     }
 
     @Override
     public void run() {
-        //Source doesn't change during playback, so we can cache it.
-        //If source changes, new thread is required.
-        DataSource source = getCurrentSource();
-
-        if(source == null) {
-            //We have no source to read from. End thread.
-            return;
-        } else if(!source.isConnected()){
+        //Connect to source if not connected
+        if(!source.isConnected()){
             Throwable res = ThrowingRunnable.run(source::connect);
             if(res != null) {
                 //We failed to connect to source. End thread.
-                //TODO: Handle exception
+                onDataSourceConnectError(source, res);
                 return;
             }
-        }
-
-        MediaExtractor extractor = getCurrentExtractor(source);
-
-        if(extractor == null) {
-            return;
         }
 
         Sample sample;
@@ -59,44 +63,50 @@ public abstract class SampleReadThread extends Thread {
 
                 if(sample == null) {
                     //We have no more samples to read. End thread.
+                    onEndOfData();
                     return;
                 }
 
                 //Handle sample
-                if(receiveSample(sample)){
+                if(onSampleRead(sample)){
                     //Thread stop was requested. End thread.
                     return;
                 }
             } catch (IOException e) {
-                if(handleException(extractor, e)) {
+                if(onIOException(source, extractor, e)) {
+                    //Thread stop was requested. End thread.
                     return;
                 }
             } catch (TimeoutException e) {
-                //Ignore
+                if(onSampleReadTimeout()) {
+                    //Thread stop was requested. End thread.
+                    return;
+                }
             } catch (InterruptedException e) {
+                //Thread stop was requested. End thread.
                 return;
+            } catch (Throwable e) {
+                if(onOtherError(extractor, e)) {
+                    //Thread stop was requested. End thread.
+                    return;
+                }
             }
         }
 
     }
 
-    @Override
-    public void interrupt() {
-        super.interrupt();
-    }
+    public abstract void onDataSourceConnectError(@NonNull DataSource source, @NonNull Throwable e);
 
-    private DataSource getCurrentSource() {
-        return null;
-    }
+    public abstract boolean onIOException(@NonNull DataSource source, @NonNull MediaExtractor extractor, @NonNull Exception e);
 
-    private MediaExtractor getCurrentExtractor(@NonNull DataSource source) {
-        return null;
-    }
+    public abstract boolean onOtherError(@NonNull MediaExtractor extractor, @NonNull Throwable e);
 
-    public abstract boolean receiveSample(@NonNull Sample sample);
+    public abstract boolean onSampleRead(@NonNull Sample sample);
 
-    private boolean handleException(@NonNull Object src, @NonNull Exception e) {
-        return false;
-    }
+    public abstract boolean onSampleReadTimeout();
+
+    public abstract void onEndOfData();
+
+    public abstract void onReadThreadEnd();
 
 }
