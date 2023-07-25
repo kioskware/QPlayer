@@ -320,7 +320,7 @@ public class QPlayer implements Flow, Task {
 
         if(frameExtractorFails.get() >= MAX_FRAME_EXTRACTOR_FAILS || frameExtractor == null) {
             //Current extractor is not working or not set, try to resolve a new one
-            String format = packet.track.format;
+            String format = packet.track.getFormat();
             if(format == null) {
                 return null;
             }

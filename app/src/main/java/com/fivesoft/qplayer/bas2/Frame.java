@@ -2,16 +2,26 @@ package com.fivesoft.qplayer.bas2;
 
 import androidx.annotation.NonNull;
 
-import com.fivesoft.qplayer.common.ByteArray;
 import com.fivesoft.qplayer.track.Track;
 
 public class Frame extends Sample {
 
-    public volatile boolean isSyncFrame;
+    public static final byte UNKNOWN_FRAME = 0x00;
+    public static final byte NON_SYNC_FRAME = 0x01;
+    public static final byte SYNC_FRAME = 0x02;
 
-    public Frame(@NonNull ByteArray data, long timestamp, @NonNull Track track, boolean isSyncFrame) {
+    public static final byte CONFIG_FRAME = 0x03;
+
+    public volatile byte frameType;
+
+    public Frame(@NonNull byte[] data, int off, int len, long timestamp, @NonNull Track track, byte frameType) {
+        super(data, off, len, timestamp, track);
+        this.frameType = frameType;
+    }
+
+    public Frame(@NonNull byte[] data, long timestamp, @NonNull Track track, byte frameType) {
         super(data, timestamp, track);
-        this.isSyncFrame = isSyncFrame;
+        this.frameType = frameType;
     }
 
 }

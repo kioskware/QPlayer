@@ -1,5 +1,7 @@
 package com.fivesoft.qplayer.bas2;
 
+import com.fivesoft.qplayer.bas2.decoder.MediaDecoder;
+
 /**
  * Thrown when exception occurs during media decoding.
  * @see MediaDecoder

@@ -1,5 +1,7 @@
 package com.fivesoft.qplayer.bas2;
 
+import com.fivesoft.qplayer.bas2.decoder.MediaDecoder;
+
 /**
  * Thrown when the {@link MediaDecoder} does not support passed {@link Sample} or {@link Frame}.<br>
  * This may be caused by:

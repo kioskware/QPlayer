@@ -5,8 +5,11 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.fivesoft.qplayer.bas2.common.Util;
+
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.security.cert.CertificateException;
@@ -125,25 +128,6 @@ public class NetUtils {
         }
     }
 
-    @NonNull
-    public static ArrayList<String> readResponseHeaders(@NonNull InputStream inputStream) throws IOException {
-//        Assert.assertNotNull("Input stream should not be null", inputStream);
-        ArrayList<String> headers = new ArrayList<>();
-        String line;
-        while (true) {
-            line = readLine(inputStream);
-            if (line != null) {
-                if (line.equals("\r\n"))
-                    return headers;
-                else
-                    headers.add(line);
-            } else {
-                break;
-            }
-        }
-        return headers;
-    }
-
     @Nullable
     public static String readLine(@NonNull InputStream inputStream) throws IOException {
 //        Assert.assertNotNull("Input stream should not be null", inputStream);
@@ -198,37 +182,17 @@ public class NetUtils {
         return -1;
     }
 
-//    @Nullable
-//    static String readContentAsText(@Nullable InputStream inputStream) throws IOException {
-//        if (inputStream == null)
-//            return null;
-//        BufferedReader r = new BufferedReader(new InputStreamReader(inputStream));
-//        StringBuilder total = new StringBuilder();
-//        String line;
-//        while ((line = r.readLine()) != null) {
-//            total.append(line);
-//            total.append("\r\n");
-//        }
-//        return total.toString();
-//    }
-
-    @NonNull
-    public static String readContentAsText(@NonNull InputStream inputStream, int length) throws IOException {
-//        Assert.assertNotNull("Input stream should not be null", inputStream);
-        if (length <= 0)
-            return "";
-        byte[] b = new byte[length];
-        int read = readData(inputStream, b, 0, length);
-        return new String(b, 0, read);
-    }
-
-    public static int readData(@NonNull InputStream inputStream, @NonNull byte[] buffer, int offset, int length) throws IOException {
+    public static int readData(@NonNull InputStream inputStream, @NonNull byte[] buffer, int offset, int length)
+            throws IOException, InterruptedIOException {
         int readBytes;
         int totalReadBytes = 0;
         do {
             readBytes = inputStream.read(buffer, offset + totalReadBytes, length - totalReadBytes);
             if (readBytes > 0)
                 totalReadBytes += readBytes;
+
+            Util.checkInterrupted();
+
         } while (readBytes >= 0 && totalReadBytes < length);
         return totalReadBytes;
     }

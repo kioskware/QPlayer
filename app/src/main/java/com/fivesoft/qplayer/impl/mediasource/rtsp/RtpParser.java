@@ -5,6 +5,8 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.fivesoft.qplayer.bas2.common.Util;
+
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -16,6 +18,7 @@ public class RtpParser {
     private final static int RTP_HEADER_SIZE = 12;
 
     public static class RtpHeader {
+
         public int version;
         public int padding;
         public int extension;
@@ -23,7 +26,7 @@ public class RtpParser {
         public int marker;
         public int payloadType;
         public int sequenceNumber;
-        public long timeStamp;
+        public long timestamp;
         public long ssrc;
         public int payloadSize;
 
@@ -38,6 +41,8 @@ public class RtpParser {
             byte[] oneByte = new byte[1];
             // Search for {0x24, 0x00}
             do {
+                Util.checkInterrupted();
+
                 if (bytesRemaining-- < 0)
                     return false;
                 // Read 1 byte
@@ -78,7 +83,7 @@ public class RtpParser {
             rtpHeader.marker = (header[1] & 0x80) >> 7;
             rtpHeader.payloadType = header[1] & 0x7F;
             rtpHeader.sequenceNumber = (header[3] & 0xFF) + ((header[2] & 0xFF) << 8);
-            rtpHeader.timeStamp = (header[7] & 0xFF) + ((header[6] & 0xFF) << 8) + ((header[5] & 0xFF) << 16) + ((long) (header[4] & 0xFF) << 24) & 0xffffffffL;
+            rtpHeader.timestamp = (header[7] & 0xFF) + ((header[6] & 0xFF) << 8) + ((header[5] & 0xFF) << 16) + ((long) (header[4] & 0xFF) << 24) & 0xffffffffL;
             rtpHeader.ssrc = (header[7] & 0xFF) + ((header[6] & 0xFF) << 8) + ((header[5] & 0xFF) << 16) + ((long) (header[4] & 0xFF) << 24) & 0xffffffffL;
             rtpHeader.payloadSize = packetSize - RTP_HEADER_SIZE;
             return rtpHeader;
@@ -99,7 +104,7 @@ public class RtpParser {
                     + ", marker: " + marker
                     + ", payload type: " + payloadType
                     + ", seq num: " + sequenceNumber
-                    + ", ts: " + timeStamp
+                    + ", ts: " + timestamp
                     + ", ssrc: " + ssrc
                     + ", payload size: " + payloadSize);
         }

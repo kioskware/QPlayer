@@ -1,5 +1,7 @@
 package com.fivesoft.qplayer.common;
 
+import java.util.Arrays;
+
 public class ByteArray extends ReadOnlyByteArray {
 
     public ByteArray(int length) {
@@ -98,4 +100,18 @@ public class ByteArray extends ReadOnlyByteArray {
         this.length = length;
     }
 
+    public ByteArray trimLeft(int length) {
+        this.offset = Math.max(0, this.offset + length);
+        this.length = Math.max(0, this.length - length);
+        return this;
+    }
+
+    public ByteArray trimRight(int length) {
+        this.length = Math.max(0, this.length - length);
+        return this;
+    }
+
+    public byte[] getArrayCopy() {
+        return Arrays.copyOfRange(array, offset, offset + length);
+    }
 }

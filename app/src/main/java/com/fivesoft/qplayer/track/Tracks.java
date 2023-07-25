@@ -71,7 +71,7 @@ public class Tracks implements Iterable<Track> {
 
     public void put(@NonNull Track track){
         synchronized (tracks) {
-            tracks.put(track.id, Objects.requireNonNull(track));
+            tracks.put(track.getId(), Objects.requireNonNull(track));
             if(track instanceof AudioTrack){
                 audioTrack = (AudioTrack) track;
             } else if(track instanceof VideoTrack){
@@ -93,6 +93,23 @@ public class Tracks implements Iterable<Track> {
     public Track get(@NonNull String id){
         synchronized (tracks) {
             return tracks.get(Objects.requireNonNull(id));
+        }
+    }
+
+    /**
+     * Returns latest track with specified payload type, or null if there was no track with the specified payload type.
+     * @param payloadType track payload type.
+     */
+
+    @Nullable
+    public Track getByPayloadType(int payloadType){
+        synchronized (tracks) {
+            for(Track track : tracks.values()){
+                if(track.getPayloadType() == payloadType){
+                    return track;
+                }
+            }
+            return null;
         }
     }
 
@@ -129,7 +146,7 @@ public class Tracks implements Iterable<Track> {
         synchronized (tracks) {
             for(Track track : tracks.values()){
                 if(predicate.test(track)){
-                    remove(track.id);
+                    remove(track.getId());
                 }
             }
         }

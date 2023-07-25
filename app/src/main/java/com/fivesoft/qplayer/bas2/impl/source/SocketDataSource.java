@@ -1,9 +1,11 @@
-package com.fivesoft.qplayer.bas2;
+package com.fivesoft.qplayer.bas2.impl.source;
 
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.fivesoft.qplayer.bas2.DataSource;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,9 +18,12 @@ import java.util.Objects;
 public class SocketDataSource extends DataSource {
 
     private final Object sl = new Object();
-    private volatile Socket socket;
+    private Socket socket;
 
     private final SocketAddress address;
+
+    private InputStream inputStream;
+    private OutputStream outputStream;
 
     public SocketDataSource(@NonNull SocketAddress address) {
         this.address = Objects.requireNonNull(address, "Socket address is null");
@@ -49,9 +54,12 @@ public class SocketDataSource extends DataSource {
             } else {
                 //Create a new socket
                 socket = new Socket();
-                socket.setSoTimeout(getTimeout());
                 //Connect to the server
                 socket.connect(address, timeout);
+                socket.setSoTimeout(getTimeout());
+                socket.setSoLinger(false, 1);
+                inputStream = socket.getInputStream();
+                outputStream = socket.getOutputStream();
             }
         }
     }
@@ -64,10 +72,9 @@ public class SocketDataSource extends DataSource {
 
     @NonNull
     @Override
-    public InputStream getInputStream() throws IOException {
-        Socket socket = this.socket;
-        if (socket != null) {
-            return socket.getInputStream();
+    public InputStream getInputStream() {
+        if (inputStream != null) {
+            return inputStream;
         } else {
             throw new IllegalStateException("Not connected");
         }
@@ -80,10 +87,9 @@ public class SocketDataSource extends DataSource {
 
     @Nullable
     @Override
-    public OutputStream getOutputStream() throws IllegalStateException, IOException {
-        Socket socket = this.socket;
+    public OutputStream getOutputStream() throws IllegalStateException {
         if (socket != null) {
-            return socket.getOutputStream();
+            return outputStream;
         } else {
             throw new IllegalStateException("Not connected");
         }

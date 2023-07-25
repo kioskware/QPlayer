@@ -16,10 +16,19 @@ public abstract class Buffer<T extends Bufferable> {
     private volatile long latency;
     private volatile boolean destroyed;
 
+    private volatile float playbackSpeed = 1f;
+
+    private volatile long actualLatency = 0;
+
     public void receive(T obj){
 
         if(destroyed)
             throw new IllegalStateException("Cannot receive on destroyed Buffer.");
+
+        if(latency == 0){
+            onFrame(obj);
+            return;
+        }
 
         buffer.add(obj);
         synchronized (ptLock) {
@@ -61,6 +70,14 @@ public abstract class Buffer<T extends Bufferable> {
 
     public long getLatency(){
         return latency;
+    }
+
+    public long getActualLatency(){
+        return actualLatency;
+    }
+
+    public float getPlaybackSpeed(){
+        return playbackSpeed;
     }
 
     public boolean isDestroyed(){
@@ -105,6 +122,21 @@ public abstract class Buffer<T extends Bufferable> {
                     while (!isInterrupted() && buffer.size() != 0) {
                         //Get current frame
                         T cFrame = buffer.get();
+                        T lFrame = buffer.getLast();
+
+                        //Calculate actual latency
+                        if (lFrame != null) {
+                            actualLatency = Math.abs(lFrame.getTimestamp() - cFrame.getTimestamp());
+                        } else {
+                            actualLatency = 0;
+                        }
+
+                        //Adjust playback speed to match latency
+                        if (actualLatency > latency) {
+                            playbackSpeed = (float) actualLatency / (float) latency;
+                        } else {
+                            playbackSpeed = 1f;
+                        }
 
                         //Get current frame timestamp
                         curTs = cFrame.getTimestamp();
@@ -112,7 +144,7 @@ public abstract class Buffer<T extends Bufferable> {
                         //Wait for timestamps difference
                         try {
                             //noinspection BusyWait
-                            Thread.sleep(Math.max(0, Math.min(curTs - prevTs, latency)));
+                            Thread.sleep((long) Math.max(0, Math.min((curTs - prevTs) / playbackSpeed, latency)));
                         } catch (InterruptedException e) {
                             break;
                         }

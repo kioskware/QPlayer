@@ -1,7 +1,9 @@
-package com.fivesoft.qplayer.bas2;
+package com.fivesoft.qplayer.bas2.impl.source;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.fivesoft.qplayer.bas2.DataSource;
 
 import java.io.File;
 import java.io.FileInputStream;

@@ -1,6 +1,8 @@
 package com.fivesoft.qplayer.buffer;
 
 
+import androidx.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Objects;
@@ -51,9 +53,24 @@ public class SortedSynchronizedList<T> {
     }
 
     public T get(){
+        return get(0);
+    }
+
+    public T get(int index){
         synchronized (parent){
-            changedAfterGet = false;
-            return parent.get(0);
+            return parent.get(index);
+        }
+    }
+
+    @Nullable
+    public T  getLast(){
+        synchronized (parent){
+            int s = parent.size();
+
+            if(s == 0)
+                return null;
+
+            return parent.get(s - 1);
         }
     }
 

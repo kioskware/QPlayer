@@ -39,6 +39,18 @@ public class Authentication {
         this(credentials, token == null ? null : token.getBytes());
     }
 
+    public Authentication(@Nullable String username, @Nullable String password, @Nullable String token) {
+        this(username == null ? null : new Credentials(username, password), token);
+    }
+
+    public Authentication(@Nullable String username, @Nullable String password, @Nullable byte[] token) {
+        this(username == null ? null : new Credentials(username, password), token);
+    }
+
+    public Authentication(@Nullable String username, @Nullable String password) {
+        this(username == null ? null : new Credentials(username, password), (String) null);
+    }
+
     /**
      * Checks if token authentication is set.
      * @return true if token authentication is set, false otherwise.
