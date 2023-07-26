@@ -18,6 +18,7 @@ import com.fivesoft.qplayer.bas2.common.ByteUtil;
 import com.fivesoft.qplayer.bas2.common.StackTraceUtil;
 import com.fivesoft.qplayer.bas2.core.MediaDecoderThread;
 import com.fivesoft.qplayer.bas2.decoder.MediaDecoder;
+import com.fivesoft.qplayer.bas2.decoder.MediaDecoderOutput;
 import com.fivesoft.qplayer.bas2.impl.decoder.video.h264.H264Decoder;
 import com.fivesoft.qplayer.bas2.impl.decoder.video.h264.VideoRtpParser;
 import com.fivesoft.qplayer.bas2.impl.extractor.rtsp.RtspMediaExtractor;
@@ -63,7 +64,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
             firstStart = false;
         } else {
             if (decoder != null) {
-                decoder.setOutput(holder.getSurface());
+                decoder.setOutput(new MediaDecoderOutput<>(holder.getSurface(), null));
             }
         }
     }
@@ -85,7 +86,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
             Uri uri = Uri.parse("rtsp://192.168.88.59:554/mainstream");
 
             try(SocketDataSource dataSource = new SocketDataSource(uri.getHost(), uri.getPort());
-                RtspMediaExtractor extractor = new RtspMediaExtractor(dataSource, uri.toString(), false, true, false)){
+                RtspMediaExtractor extractor = new RtspMediaExtractor(dataSource, uri.toString())){
 
                 dataSource.connect();
                 extractor.setAuthentication(new Authentication("admin", "admin"));
@@ -107,7 +108,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
 
                 decoder = new H264Decoder(videoTrack, extractor.getSampleFormat());
 
-                decoder.setOutput(surface);
+                decoder.setOutput(new MediaDecoderOutput<>(surface, null));
                 decoder.setCsd(videoTrack.getCsd());
 
                 AtomicReference<MediaDecoderThread> decoderThread = new AtomicReference<>();
@@ -133,11 +134,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
                 Buffer<Frame> buffer = new Buffer<Frame>(){
                     @Override
                     protected void onFrame(Frame frame) {
-                        try {
-                            decoderThread.get().feed(frame);
-                        } catch (InterruptedIOException e) {
-                            throw new RuntimeException(e);
-                        }
+                        decoderThread.get().feed(frame);
                     }
                 };
 

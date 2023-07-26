@@ -7,6 +7,7 @@ import com.fivesoft.qplayer.bas2.decoder.MediaDecoder;
 import com.fivesoft.qplayer.track.Tracks;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Iterator;
 import java.util.Objects;
 
@@ -28,69 +29,29 @@ public abstract class MediaExtractor
     protected final DataSource dataSource;
     private int timeout = 15000;
 
-    /**
-     * Extractor setting, indicates whether to extract audio samples or not.<br>
-     * The setting can be set only in the constructor and cannot be changed later.<br>
-     * Setting to true does not guarantee that the extractor will extract audio samples,
-     * because audio samples may not be present in the data source.<br>
-     */
-    public final boolean extractAudio;
-
-    /**
-     * Extractor setting, indicates whether to extract video samples or not.<br>
-     * The setting can be set only in the constructor and cannot be changed later.<br>
-     * Setting to true does not guarantee that the extractor will extract video samples,
-     * because video samples may not be present in the data source.<br>
-     */
-    public final boolean extractVideo;
-
-    /**
-     * Extractor setting, indicates whether to extract subtitle samples or not.<br>
-     * The setting can be set only in the constructor and cannot be changed later.<br>
-     * Setting to true does not guarantee that the extractor will extract subtitle samples,
-     * because subtitle samples may not be present in the data source.<br>
-     */
-    public final boolean extractSubtitle;
-
-    /**
-     * Extractor setting, indicates whether to extract non-standard tracks or not.<br>
-     * The setting can be set only in the constructor and cannot be changed later.<br>
-     * <br>
-     * Used only by non-standard extractors, supporting non-standard tracks. (other than audio, video and subtitle tracks)<br>
-     */
-
-    public final int extractFlags;
+    @NonNull
+    public final TrackSelector trackSelector;
 
     /**
      * Creates a new extractor for the specified data source.<br>
-     * @param dataSource The data source to extract samples from.
-     * @param audio Whether to extract audio samples or not.
-     * @param video Whether to extract video samples or not.
-     * @param subtitle Whether to extract subtitle samples or not.
-     * @param flags (optional) Flags to be passed to the extractor, if data source contain non-standard tracks.
-     *              (other than audio, video and subtitle tracks)
+     * @param dataSource The data source to extract samples from. May be not connected while creating the extractor.
+     * @param trackSelector The track selector to select tracks to extract. If null, all tracks will be selected.
      * @throws NullPointerException if the data source is null.
      */
 
-    public MediaExtractor(@NonNull DataSource dataSource, boolean audio, boolean video, boolean subtitle, int flags){
+    public MediaExtractor(@NonNull DataSource dataSource, @Nullable TrackSelector trackSelector){
         this.dataSource = Objects.requireNonNull(dataSource);
-        this.extractAudio = audio;
-        this.extractVideo = video;
-        this.extractSubtitle = subtitle;
-        this.extractFlags = flags;
+        this.trackSelector = trackSelector == null ? TrackSelector.ALL : trackSelector;
     }
 
     /**
-     * Creates a new extractor for the specified data source.<br>
+     * Creates a new extractor for the specified data source which extracts all tracks.<br>
      * @param dataSource The data source to extract samples from.
-     * @param audio Whether to extract audio samples or not.
-     * @param video Whether to extract video samples or not.
-     * @param subtitle Whether to extract subtitle samples or not.
      * @throws NullPointerException if the data source is null.
      */
 
-    public MediaExtractor(@NonNull DataSource dataSource, boolean audio, boolean video, boolean subtitle){
-        this(dataSource, audio, video, subtitle, 0);
+    public MediaExtractor(@NonNull DataSource dataSource){
+        this(dataSource, null);
     }
 
     /**
@@ -101,6 +62,13 @@ public abstract class MediaExtractor
      */
 
     public abstract void prepare(int timeout) throws IOException, TimeoutException, InterruptedException;
+
+    /**
+     * Checks if the extractor is prepared.<br>
+     * @return true if the extractor is prepared, false otherwise.
+     * @see #prepare(int)
+     */
+    public abstract boolean isPrepared();
 
     /**
      * Reads next sample from the data source.<br>
@@ -219,4 +187,19 @@ public abstract class MediaExtractor
      */
 
     protected abstract void onTimeoutSet(int timeout) throws IOException;
+
+    public static class Descriptor {
+
+        public final DataSource dataSource;
+        public final TrackSelector trackSelector;
+        public final URI uri;
+
+        public Descriptor(DataSource dataSource, TrackSelector trackSelector, URI uri){
+            this.dataSource = dataSource;
+            this.trackSelector = trackSelector;
+            this.uri = uri;
+        }
+
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.fivesoft.qplayer.bas2.impl.decoder.video.h264;
 
+import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
@@ -21,14 +22,70 @@ import com.fivesoft.qplayer.bas2.common.Size;
 import com.fivesoft.qplayer.bas2.common.Util;
 import com.fivesoft.qplayer.bas2.core.FrameBuilder;
 import com.fivesoft.qplayer.bas2.decoder.MediaDecoder;
+import com.fivesoft.qplayer.bas2.decoder.MediaDecoderOutput;
 import com.fivesoft.qplayer.bas2.decoder.VideoDecoder;
+import com.fivesoft.qplayer.bas2.resolver.Creator;
 import com.fivesoft.qplayer.track.VideoTrack;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class H264Decoder extends VideoDecoder {
+
+    public static final List<Integer> SUPPORTED_SAMPLE_FORMATS =
+            new ArrayList<>(Arrays.asList(MediaDecoder.FORMAT_RTP, MediaDecoder.FORMAT_RAW));
+
+    public static final Creator<Descriptor, VideoDecoder> CREATOR =
+            new Creator<Descriptor, VideoDecoder>() {
+
+        @Override
+        public int accept(Descriptor t) {
+            if(t == null)
+                return 0;
+
+            if(!(t.track instanceof VideoTrack))
+                return 0;
+
+            String format = t.track.getFormat();
+            if(format == null)
+                return 0;
+
+            format = format.toLowerCase()
+                    .replace(" ", "");
+
+            if(format.equals("h264") || format.equals("h.264") || format.equals("avc") ||
+                    format.equals("h264/avc") || format.equals("h.264/avc") || format.equals("advancedvideocoding"))
+                return 1;
+
+            if(format.contains("/avc") || format.contains("/h264") || format.contains("/h.264"))
+                return 1;
+
+            if(!SUPPORTED_SAMPLE_FORMATS.contains(t.sampleFormat))
+                return 0;
+
+            return 1;
+        }
+
+        @Nullable
+        @Override
+        public H264Decoder create(Descriptor t) {
+            if(accept(t) > 0)
+                return new H264Decoder((VideoTrack) t.track, t.sampleFormat, t.maxEncodedFrameSize);
+
+            return null;
+        }
+    };
+
+    public static final int MIN_VIDEO_WIDTH = 256; // 144p
+    public static final int MIN_VIDEO_HEIGHT = 144; // 144p
+
+    public static final int MAX_VIDEO_WIDTH = 4096; // 4K
+    public static final int MAX_VIDEO_HEIGHT = 2304; // 4K
 
     private static final long DEQUEUE_INPUT_TIMEOUT_US = TimeUnit.MILLISECONDS.toMicros(0);
     private static final long DEQUEUE_OUTPUT_BUFFER_TIMEOUT_US = TimeUnit.MILLISECONDS.toMicros(0);
@@ -44,6 +101,8 @@ public class H264Decoder extends VideoDecoder {
     private volatile Csd csd;
     private volatile Surface output;
     private volatile boolean released = false;
+
+    private volatile Surface codecSurface;
 
     //Used to calculate presentationTimeUs
     private long frameIndex = 0;
@@ -112,14 +171,9 @@ public class H264Decoder extends VideoDecoder {
     }
 
     @Override
-    public void setOutput(Surface output) throws IllegalStateException, IllegalArgumentException {
-        this.output = output;
+    public void setOutput(@Nullable MediaDecoderOutput<Surface> output) throws IllegalStateException, IllegalArgumentException {
         checkReleased();
-
-        MediaCodec codec = this.codec;
-        if (codec != null) {
-            codec.setOutputSurface(output);
-        }
+        this.output = output == null ? null : output.getRenderer();
     }
 
     @Nullable
@@ -135,8 +189,10 @@ public class H264Decoder extends VideoDecoder {
         checkReleased();
 
         try {
+            //Ensure that output surface matches set output surface
+            updateCodecSurface();
+            //Ensure that codec is configured
             MediaCodec codec = ensureMediaCodec();
-            Surface output = this.output;
 
             if (frame.frameType == Frame.CONFIG_FRAME) {
                 byte nalUnitType = H264Util.getNalUnitType(frame.getArray(), frame.getOffset(), frame.getLength());
@@ -148,20 +204,16 @@ public class H264Decoder extends VideoDecoder {
                 }
             } else if (!spsReceived || !ppsReceived) {
                 //Codec not configured yet
+                waitForKeyFrame = true;
                 return MediaDecoder.ACTION_NOT_CONFIGURED;
             } else if(waitForKeyFrame){
                 if(frame.frameType == Frame.SYNC_FRAME){
-                    codec.flush();
-                    configCsd(format, codec, csd);
+                    Log.println(Log.ASSERT, "sdfsdf", "Received key frame, flushing codec");
+                    flush();
                     waitForKeyFrame = false;
                 } else {
                     return MediaDecoder.ACTION_WAITING_FOR_KEY_FRAME;
                 }
-            } else if(output == null || !output.isValid()){
-                waitForKeyFrame = true;
-                flush();
-                configCsd(format, codec, csd);
-                return ACTION_INVALID_OUTPUT;
             }
 
             int inIndex, outIndex;
@@ -247,11 +299,35 @@ public class H264Decoder extends VideoDecoder {
         return false;
     }
 
+    private synchronized void updateCodecSurface() throws IOException {
+        MediaCodec codec = this.codec;
+        Surface output = this.output;
+
+        if(output != null && !output.isValid()){
+            output = null;
+            this.output = null;
+        }
+
+        if (codec != null && codecSurface != output) {
+            try {
+                codec.setOutputSurface(output);
+                Log.println(Log.ASSERT, "errr", "Set output surface " + output);
+                codecSurface = output;
+            } catch (IllegalStateException | IllegalArgumentException e) {
+                Log.println(Log.ASSERT, "errr", "Failed to set output surface " + e);
+                //Reconfigure codec and try again
+                destroyMediaCodec();
+                ensureMediaCodec();
+            }
+        }
+    }
+
     @Override
     public void flush() {
         MediaCodec codec = this.codec;
         if (codec != null) {
             flushCodecQuietly();
+            configCsd(format, codec, csd);
         }
     }
 
@@ -280,7 +356,9 @@ public class H264Decoder extends VideoDecoder {
             codec = MediaCodec.createDecoderByType(MIME);
             Size safeSize = getDecoderSafeWidthHeight(codec);
             format = MediaFormat.createVideoFormat(MIME, safeSize.width, safeSize.height);
+            //format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
             bufferInfo = new MediaCodec.BufferInfo();
+            frameIndex = 0;
 
             codec.setOnFrameRenderedListener(onFrameRenderedListener, null);
 
@@ -288,8 +366,10 @@ public class H264Decoder extends VideoDecoder {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 params.putInt(MediaCodec.PARAMETER_KEY_LOW_LATENCY, 1);
             }
+
             configCsd(format, codec, csd);
             codec.configure(format, output, null, 0);
+            codecSurface = output;
 
             codec.setParameters(params);
             codec.start();
@@ -329,10 +409,14 @@ public class H264Decoder extends VideoDecoder {
     private void destroyMediaCodec() {
         MediaCodec codec = this.codec;
         if (codec != null) {
-            stopCodecQuietly();
             codec.release();
-            this.codec = null;
         }
+        this.format = null;
+        this.codec = null;
+        this.waitForKeyFrame = true;
+        this.ppsReceived = false;
+        this.spsReceived = false;
+        this.codecSurface = null;
     }
 
     private void stopCodecQuietly() {
@@ -357,15 +441,18 @@ public class H264Decoder extends VideoDecoder {
                         .getCapabilitiesForType(MIME)
                         .getVideoCapabilities();
 
+        int width = Util.limit(videoWidth, MIN_VIDEO_WIDTH, MAX_VIDEO_WIDTH);
+        int height = Util.limit(videoHeight, MIN_VIDEO_HEIGHT, MAX_VIDEO_HEIGHT);
+
         Size size;
-        if (c.isSizeSupported(track.getWidth(), track.getHeight())) {
-            size = new Size(track.getWidth(), track.getHeight());
+        if (c.isSizeSupported(width, height)) {
+            size = new Size(width, height);
         } else {
             int wa = c.getWidthAlignment();
             int ha = c.getHeightAlignment();
             size = new Size(
-                    ceilDivide(track.getWidth(), wa) * wa,
-                    ceilDivide(track.getHeight(), ha) * ha
+                    ceilDivide(width, wa) * wa,
+                    ceilDivide(height, ha) * ha
             );
         }
 
@@ -393,9 +480,27 @@ public class H264Decoder extends VideoDecoder {
                     SPSParser.parseSPSStatic(sps, H264Util.startsWithNalPrefix(sps, off, len));
 
             if (videoParams != null) {
-                videoWidth = videoParams.width;
-                videoHeight = videoParams.height;
-                videoFrameRate = videoParams.frameRate;
+                if (videoParams.width > 0 && videoParams.height > 0
+                    && videoParams.width != videoWidth && videoParams.height != videoHeight) {
+
+                    videoWidth = videoParams.width;
+                    videoHeight = videoParams.height;
+
+                    track.setWidth(videoWidth);
+                    track.setHeight(videoHeight);
+
+                    MediaFormat format = this.format;
+                    if(format != null){
+                        format.setInteger(MediaFormat.KEY_WIDTH, videoWidth);
+                        format.setInteger(MediaFormat.KEY_HEIGHT, videoHeight);
+                    }
+                }
+
+                if(videoParams.frameRate > 0 && videoParams.frameRate != videoFrameRate && videoParams.frameRate <= 130){
+                    videoFrameRate = videoParams.frameRate;
+                    track.setFps(videoFrameRate);
+                }
+
                 Log.println(Log.ASSERT, "H264Decoder", "obtainVideoParamsFromPPS: " + videoParams);
             }
 
@@ -405,4 +510,5 @@ public class H264Decoder extends VideoDecoder {
         }
 
     }
+
 }

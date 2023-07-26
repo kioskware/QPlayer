@@ -12,7 +12,7 @@ import java.util.concurrent.BlockingQueue;
 
 public abstract class MediaDecoderThread extends Thread {
 
-    private final BlockingQueue<Frame> frameQueue = new ArrayBlockingQueue<>(100);
+    private final BlockingQueue<Frame> frameQueue = new ArrayBlockingQueue<>(10);
 
     private final MediaDecoder<?, ?> decoder;
 
@@ -37,12 +37,8 @@ public abstract class MediaDecoderThread extends Thread {
 
     }
 
-    public void feed(@NonNull Frame frame) throws InterruptedIOException {
-        try {
-            frameQueue.put(Objects.requireNonNull(frame));
-        } catch (InterruptedException e) {
-            throw new InterruptedIOException();
-        }
+    public boolean feed(@NonNull Frame frame) {
+        return frameQueue.offer(frame);
     }
 
     public abstract void onThreadInterrupted(@NonNull MediaDecoder<?, ?> decoder);

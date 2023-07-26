@@ -58,6 +58,7 @@ public class SortedSynchronizedList<T> {
 
     public T get(int index){
         synchronized (parent){
+            changedAfterGet = false;
             return parent.get(index);
         }
     }

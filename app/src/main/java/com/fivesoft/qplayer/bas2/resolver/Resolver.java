@@ -1,4 +1,4 @@
-package com.fivesoft.qplayer.resolver;
+package com.fivesoft.qplayer.bas2.resolver;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -11,17 +11,33 @@ public class Resolver<D, R> {
 
     private final Set<Creator<D, R>> creators = new HashSet<>();
 
+    /**
+     * Registers the creator in the resolver.<br>
+     * @param creator The creator to be registered.
+     */
+
     public void register(@NonNull Creator<D, R> creator) {
         synchronized (creators) {
             creators.add(Objects.requireNonNull(creator));
         }
     }
 
+    /**
+     * Unregisters the creator from the resolver.<br>
+     * @param candidate The creator to be unregistered.
+     */
+
     public void unregister(@NonNull Creator<D, R> candidate) {
         synchronized (creators) {
             creators.remove(Objects.requireNonNull(candidate));
         }
     }
+
+    /**
+     * Resolves the descriptor to the result object.<br>
+     * @param descriptor The descriptor of the object to be created.
+     * @return The result object. May be null if no creator can create such object.
+     */
 
     @Nullable
     public R resolve(@NonNull D descriptor) {

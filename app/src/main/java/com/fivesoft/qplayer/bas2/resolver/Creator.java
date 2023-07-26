@@ -1,4 +1,4 @@
-package com.fivesoft.qplayer.resolver;
+package com.fivesoft.qplayer.bas2.resolver;
 
 import androidx.annotation.Nullable;
 
@@ -17,7 +17,7 @@ public interface Creator<D, R> {
     /**
      * Checks if the creator can create the task based on given task description (T).<br>
      * @param t The description of the task.
-     * @return positive value if the creator can create an object from description, negative value otherwise.<br>
+     * @return positive value if the creator can create an object from description, non-positive value otherwise.<br>
      * Higher values mean that the performer is more suitable for the task.
      */
 

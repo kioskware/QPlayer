@@ -6,6 +6,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.fivesoft.qplayer.bas2.DataSource;
+import com.fivesoft.qplayer.bas2.common.Util;
+import com.fivesoft.qplayer.bas2.resolver.Creator;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,9 +15,59 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.URI;
 import java.util.Objects;
 
 public class SocketDataSource extends DataSource {
+
+    public static final Creator<URI, DataSource> CREATOR = new Creator<URI, DataSource>() {
+        @Override
+        public int accept(URI t) {
+            if(t == null)
+                return 0;
+
+            //noinspection all
+            String scheme = t.getScheme();
+            if (scheme == null)
+                return 0;
+
+            int port = t.getPort();
+
+            if (port == -1){
+                port = Util.getDefaultPort(scheme);
+            }
+
+            if (port == -1)
+                return 0;
+
+            String host = t.getHost();
+            if (host == null)
+                return 0;
+
+            switch (scheme) {
+                case "http":
+                case "rtsp":
+                case "rtmp":
+                case "tcp":
+                    return 1;
+                default:
+                    return 0;
+            }
+        }
+
+        @Nullable
+        @Override
+        public SocketDataSource create(URI t) {
+            if(accept(t) > 0) {
+                int port = t.getPort();
+                if (port == -1){
+                    port = Util.getDefaultPort(t.getScheme());
+                }
+                return new SocketDataSource(t.getHost(), port);
+            }
+            return null;
+        }
+    };
 
     private final Object sl = new Object();
     private Socket socket;

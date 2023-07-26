@@ -8,6 +8,7 @@ import com.fivesoft.qplayer.bas2.Frame;
 import com.fivesoft.qplayer.bas2.MediaDecoderException;
 import com.fivesoft.qplayer.bas2.Sample;
 import com.fivesoft.qplayer.bas2.UnsupportedSampleException;
+import com.fivesoft.qplayer.bas2.resolver.Creator;
 import com.fivesoft.qplayer.track.Track;
 
 import java.util.Objects;
@@ -26,12 +27,12 @@ import java.util.Objects;
  *     should work independently from each other.
  * </p>
  *
- * @param <OutputType> Type of the output where frame should be played.
+ * @param <RendererType> Type of the output where frame should be played.
  *                     (e.g. {@link android.view.Surface Surface} for video decoder)
  * @param <TrackType>  Type of the track that the decoder decodes.
  */
 
-public abstract class MediaDecoder<TrackType extends Track, OutputType> {
+public abstract class MediaDecoder<TrackType extends Track, RendererType> {
 
     public static final int ACTION_DROP_FRAME_UNRECOGNIZED = -1;
 
@@ -83,6 +84,20 @@ public abstract class MediaDecoder<TrackType extends Track, OutputType> {
         this.track = Objects.requireNonNull(track);
         this.sampleFormat = sampleFormat;
         this.maxEncodedFrameSize = maxEncodedFrameSize;
+    }
+
+    /**
+     * Creates a new media decoder from Descriptor.
+     * @param descriptor Descriptor of the decoder.
+     * @throws ClassCastException If track type (from descriptor) not matches the decoder.
+     * @throws UnsupportedSampleFormatException If the sample format is not supported by the decoder.
+     */
+
+    protected MediaDecoder(@NonNull Descriptor descriptor) throws ClassCastException, UnsupportedSampleFormatException {
+        //noinspection unchecked
+        this.track = (TrackType) Objects.requireNonNull(descriptor.track);
+        this.sampleFormat = descriptor.sampleFormat;
+        this.maxEncodedFrameSize = descriptor.maxEncodedFrameSize;
     }
 
     /**
@@ -141,7 +156,7 @@ public abstract class MediaDecoder<TrackType extends Track, OutputType> {
      * @throws IllegalArgumentException If the output is not supported by the decoder or is wrong.
      */
 
-    public abstract void setOutput(OutputType output)
+    public abstract void setOutput(@Nullable MediaDecoderOutput<RendererType> output)
             throws IllegalStateException, IllegalArgumentException;
 
     /**
@@ -243,5 +258,20 @@ public abstract class MediaDecoder<TrackType extends Track, OutputType> {
 
     }
 
+    /**
+     * Descriptor of the decoder used by {@link Creator} to create the decoder.
+     */
+    public static class Descriptor {
+
+        public final Track track;
+        public final int sampleFormat;
+        public final int maxEncodedFrameSize;
+
+        public Descriptor(Track track, int sampleFormat, int maxEncodedFrameSize) {
+            this.track = track;
+            this.sampleFormat = sampleFormat;
+            this.maxEncodedFrameSize = maxEncodedFrameSize;
+        }
+    }
 
 }

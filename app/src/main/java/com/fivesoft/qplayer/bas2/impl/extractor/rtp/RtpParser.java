@@ -1,4 +1,4 @@
-package com.fivesoft.qplayer.impl.mediasource.rtsp;
+package com.fivesoft.qplayer.bas2.impl.extractor.rtp;
 
 import android.util.Log;
 
@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.fivesoft.qplayer.bas2.common.Util;
+import com.fivesoft.qplayer.bas2.common.NetUtils;
 
 import java.io.IOException;
 import java.io.InputStream;

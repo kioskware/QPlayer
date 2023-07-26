@@ -3,7 +3,7 @@ package com.fivesoft.qplayer.impl;
 import static com.fivesoft.qplayer.bas2.common.Util.checkInterrupted;
 import static com.fivesoft.qplayer.bas2.common.Util.getHexStringFromBytes;
 import static com.fivesoft.qplayer.bas2.common.Util.readUntilBytesFound;
-import static com.fivesoft.qplayer.impl.mediasource.rtsp.NetUtils.readLine;
+import static com.fivesoft.qplayer.bas2.common.NetUtils.readLine;
 
 import android.text.TextUtils;
 import android.util.Base64;
@@ -23,11 +23,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class RtspUtil {
 

@@ -2,10 +2,7 @@ package com.fivesoft.qplayer.bas2.impl.extractor.rtsp;
 
 import static com.fivesoft.qplayer.bas2.common.Util.checkInterrupted;
 import static com.fivesoft.qplayer.bas2.common.Util.getBytesFromHexString;
-import static com.fivesoft.qplayer.impl.RtspUtil.RTSP_CAPABILITY_GET_PARAMETER;
-import static com.fivesoft.qplayer.impl.RtspUtil.hasCapability;
 
-import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
@@ -18,39 +15,58 @@ import com.fivesoft.qplayer.bas2.DataSource;
 import com.fivesoft.qplayer.bas2.MediaExtractor;
 import com.fivesoft.qplayer.bas2.Sample;
 import com.fivesoft.qplayer.bas2.TimeoutException;
-import com.fivesoft.qplayer.bas2.common.ByteUtil;
+import com.fivesoft.qplayer.bas2.TrackSelector;
 import com.fivesoft.qplayer.bas2.common.Constants;
 import com.fivesoft.qplayer.bas2.common.Util;
 import com.fivesoft.qplayer.bas2.decoder.MediaDecoder;
-import com.fivesoft.qplayer.common.ByteArray;
+import com.fivesoft.qplayer.bas2.resolver.Creator;
 import com.fivesoft.qplayer.common.Header;
 import com.fivesoft.qplayer.common.Headers;
 import com.fivesoft.qplayer.impl.RtspUtil;
-import com.fivesoft.qplayer.impl.mediasource.rtsp.NetUtils;
-import com.fivesoft.qplayer.impl.mediasource.rtsp.RtpParser;
+import com.fivesoft.qplayer.bas2.common.NetUtils;
+import com.fivesoft.qplayer.bas2.impl.extractor.rtp.RtpParser;
 import com.fivesoft.qplayer.track.AudioTrack;
-import com.fivesoft.qplayer.track.SubtitleTrack;
 import com.fivesoft.qplayer.track.Track;
 import com.fivesoft.qplayer.track.Tracks;
-import com.fivesoft.qplayer.track.VideoTrack;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
-import java.util.Queue;
 
 /*
     Based on https://github.com/alexeyvasilyev/rtsp-client-android
  */
 
 public class RtspMediaExtractor extends MediaExtractor {
+
+    public static final Creator<Descriptor, MediaExtractor> CREATOR =
+            new Creator<Descriptor, MediaExtractor>() {
+        @Override
+        public int accept(Descriptor t) {
+            if(t == null)
+                return 0;
+
+            if(t.uri == null || t.dataSource == null || !t.dataSource.isOutSupported())
+                return 0;
+
+            if(!"rtsp".equals(t.uri.getScheme()))
+                return 0;
+
+            return 1;
+        }
+
+        @Nullable
+        @Override
+        public MediaExtractor create(Descriptor t) {
+            if(accept(t) > 0){
+                return new RtspMediaExtractor(t.dataSource, t.trackSelector, t.uri.toString());
+            }
+            return null;
+        }
+    };
 
     public static final int DEFAULT_BUFFER_SIZE = 8192;
 
@@ -64,7 +80,6 @@ public class RtspMediaExtractor extends MediaExtractor {
 
     private String userAgent = DEFAULT_USER_AGENT;
 
-    private final Queue<Sample> sampleQueue = new ArrayDeque<>(5);
     private byte[] readBuffer = new byte[0];
 
     private final Object bufferLock = new Object();
@@ -86,13 +101,14 @@ public class RtspMediaExtractor extends MediaExtractor {
     private volatile Authentication auth;
     private volatile RtspSession rtspSession;
 
-    public RtspMediaExtractor(@NonNull DataSource dataSource, @NonNull String uri, boolean audio, boolean video, boolean subtitle, int flags) {
-        super(dataSource, audio, video, subtitle, flags);
-        this.uri = Objects.requireNonNull(uri, "uri is null");
+    public RtspMediaExtractor(@NonNull DataSource dataSource, @Nullable TrackSelector trackSelector, String uri) {
+        super(dataSource, trackSelector);
+        this.uri = uri;
     }
 
-    public RtspMediaExtractor(@NonNull DataSource dataSource, @NonNull String uri, boolean audio, boolean video, boolean subtitle) {
-        this(dataSource, uri, audio, video, subtitle, 0);
+    public RtspMediaExtractor(@NonNull DataSource dataSource, String uri) {
+        super(dataSource);
+        this.uri = uri;
     }
 
     public void setUserAgent(@Nullable String userAgent) {
@@ -160,15 +176,7 @@ public class RtspMediaExtractor extends MediaExtractor {
                 if (track == null)
                     continue; //Just in case
 
-                if (!extractAudio && track instanceof AudioTrack) {
-                    continue;
-                }
-
-                if (!extractVideo && track instanceof VideoTrack) {
-                    continue;
-                }
-
-                if (!extractSubtitle && track instanceof SubtitleTrack) {
+                if (!trackSelector.selectTrack(track)) {
                     continue;
                 }
 
@@ -214,31 +222,31 @@ public class RtspMediaExtractor extends MediaExtractor {
     }
 
     @Override
+    public boolean isPrepared() {
+        return prepared;
+    }
+
+    @Override
     public synchronized Sample nextSample() throws IOException, TimeoutException, IllegalStateException, InterruptedException {
 
         if (!prepared) {
             throw new IllegalStateException("Not prepared, call prepare() first");
         }
 
-        if (sampleQueue.size() == 0) {
-            //There is no samples in queue, read next samples
-            readNextSample();
-        }
-
         sendKeepAliveIfNeeded();
         sampleIndex++;
 
-        return sampleQueue.poll();
+        return readNextSample();
     }
 
-    private void readNextSample() throws IOException, TimeoutException {
+    private Sample readNextSample() throws IOException, TimeoutException {
         //Read samples
         synchronized (bufferLock) {
             InputStream inputStream = dataSource.getInputStream();
             RtpParser.RtpHeader header = RtpParser.readHeader(inputStream);
 
             if (header == null) {
-                return;
+                return null;
             }
 
             if (header.payloadSize > readBuffer.length || true) {
@@ -250,7 +258,7 @@ public class RtspMediaExtractor extends MediaExtractor {
             Track track = tracks.getByPayloadType(header.payloadType);
 
             if (track == null) {
-                return;
+                return null;
             }
 
             long timestamp = header.timestamp;
@@ -259,7 +267,7 @@ public class RtspMediaExtractor extends MediaExtractor {
             }
 
             lastTimestamp = timestamp;
-            sampleQueue.add(new Sample(readBuffer, timestamp, track));
+            return  new Sample(readBuffer, timestamp, track);
         }
     }
 

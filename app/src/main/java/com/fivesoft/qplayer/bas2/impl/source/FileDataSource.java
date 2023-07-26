@@ -4,15 +4,48 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.fivesoft.qplayer.bas2.DataSource;
+import com.fivesoft.qplayer.bas2.resolver.Creator;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 import java.util.Objects;
 
 public class FileDataSource extends DataSource {
+
+    public static Creator<URI, DataSource> CREATOR = new Creator<URI, DataSource>() {
+        @Override
+        public int accept(URI t) {
+
+            if(t == null)
+                return 0;
+
+            if(!"file".equals(t.getScheme()))
+                return 0;
+
+            String path = t.getPath();
+
+            return path == null ? 0 : 1;
+        }
+
+        @Nullable
+        @Override
+        public DataSource create(URI t) {
+
+            if(accept(t) == 0)
+                return null;
+
+            String path = Objects.requireNonNull(t).getPath();
+
+            if(path == null)
+                return null;
+
+            return new FileDataSource(path);
+        }
+    };
 
     private final File file;
     private volatile FileInputStream in;

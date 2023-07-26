@@ -1,16 +1,13 @@
 package com.fivesoft.qplayer.bas2.common;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
-import com.fivesoft.qplayer.impl.mediasource.rtsp.NetUtils;
-
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.math.BigInteger;
-import java.util.Objects;
 
 public class Util {
 
@@ -109,6 +106,82 @@ public class Util {
         }
         sb.append("};");
         return sb.toString();
+    }
+
+    public static int getDefaultPort(String schema) {
+        if (schema == null)
+            return -1;
+
+        switch (schema) {
+            case "http":
+            case "rtmpte":
+            case "rtmpt":
+                return 80;
+            case "https":
+            case "rtmps":
+            case "tls":
+                return 443;
+            case "rtsp":
+            case "tcp":
+                return 554;
+            case "rtmp":
+            case "rtmpe":
+            case "rtmfp":
+                return 1935;
+            case "mms":
+                return 1755;
+            case "udp":
+            case "rtcp":
+            case "rtp":
+            case "sdp":
+            case "file":
+            case "rtpm":
+                return 0;
+            case "rtpu":
+                return 5004;
+            case "rtspu":
+                return 5005;
+            case "rtmpts":
+                return 5008;
+            case "rtmptsu":
+                return 5009;
+
+        }
+
+        return -1;
+    }
+
+    public static boolean closeQuietly(@Nullable Closeable closeable) {
+        if (closeable == null)
+            return false;
+
+        try {
+            closeable.close();
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public static boolean closeQuietly(@Nullable AutoCloseable closeable) {
+        if (closeable == null)
+            return false;
+
+        try {
+            closeable.close();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+            return true;
+        } catch (InterruptedException e) {
+            return false;
+        }
     }
 
 }
